@@ -184,11 +184,13 @@
       (select-window hiwin-active-window))
     ))
 
+;;;###autoload
 (defun hiwin-activate ()
   (interactive)
   (add-hook 'post-command-hook 'hiwin-command-hook)
   )
 
+;;;###autoload
 (defun hiwin-deactivate ()
   (interactive)
   (remove-hook 'post-command-hook 'hiwin-command-hook)
