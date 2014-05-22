@@ -1,5 +1,3 @@
-;;; -*- Mode: Emacs-Lisp  ;  Coding: utf-8 -*-
-
 ;;; hiwin.el --- Visible active window mode.
 ;;
 ;; Copyright (C) 2009 k.sugita
@@ -61,6 +59,8 @@
 ;; http://ksugita.blog62.fc2.com/blog-entry-8.html
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+;;; Code:
 
 ;; hiwin-modeの実行状態．non-nilの場合，hiwin-modeは有効．
 (defvar hiwin-visible-status nil)
@@ -219,3 +219,9 @@
 
 (provide 'hiwin)
 
+;; Local Variables:
+;; mode: emacs-lisp
+;; coding: utf-8
+;; End:
+
+;;; hiwin.el ends here
