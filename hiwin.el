@@ -78,9 +78,10 @@
 (defvar hiwin-overlays nil)
 
 ;; 非アクティブウィンドウのオーバーレイ描画用のフェイス．
-(defvar hiwin-face nil)
-(make-face 'hiwin-face)
-(set-face-attribute 'hiwin-face nil :background "gray25")
+(defface hiwin-face
+  '((t (:background "gray25")))
+  "Face for inactive window.")
+
 
 (defvar hiwin-server-flag nil)
 
