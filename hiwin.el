@@ -77,6 +77,10 @@
 ;; 非アクティブウィンドウのオーバーレイ．
 (defvar hiwin-overlays nil)
 
+;; 常時アクティブにするバッファ名の正規表現
+(defvar hiwin-always-active-buffer-name-regexp "^\\*helm")
+
+
 ;; 非アクティブウィンドウのオーバーレイ描画用のフェイス．
 (defvar hiwin-face nil)
 (make-face 'hiwin-face)
@@ -163,7 +167,8 @@
       ;; ミニバッファとアクティブ ウィンドウ以外を処理
       (unless (or (eq hw-tgt-win (minibuffer-window))
                   (eq hw-tgt-win hiwin-active-window)
-                  (string-match "^\\*helm" (buffer-name (window-buffer hw-tgt-win))))
+                  (string-match hiwin-always-active-buffer-name-regexp
+                                (buffer-name (window-buffer hw-tgt-win))))
           (progn
             ;; 処理対象ウィンドウを選択
             (select-window hw-tgt-win)
