@@ -162,7 +162,8 @@
       (setq hw-win-lst (cdr hw-win-lst))
       ;; ミニバッファとアクティブ ウィンドウ以外を処理
       (unless (or (eq hw-tgt-win (minibuffer-window))
-                  (eq hw-tgt-win hiwin-active-window))
+                  (eq hw-tgt-win hiwin-active-window)
+                  (string-match "^\\*helm" (buffer-name (window-buffer hw-tgt-win))))
           (progn
             ;; 処理対象ウィンドウを選択
             (select-window hw-tgt-win)
