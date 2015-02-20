@@ -186,9 +186,9 @@
             )
           ))
     ;; 元のアクティブウィンドウを選択
-    (if  hiwin-server-flag
-      (setq hiwin-server-flag 'nil)
-      (select-window hiwin-active-window))
+    (when hiwin-server-flag
+      (setq hiwin-server-flag 'nil))
+    (select-window hiwin-active-window)
     ))
 
 ;;;###autoload
