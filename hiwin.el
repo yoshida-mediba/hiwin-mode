@@ -173,10 +173,6 @@
           (progn
             ;; 処理対象ウィンドウを選択
             (select-window hw-tgt-win)
-            ;; バッファ末尾の場合，ポイントを一文字戻す
-            (if (and (eq (point) (point-max))
-                     (> (point-max) 1))
-                (backward-char 1))
             ;; 処理対象ウィンドウにオーバーレイを設定
             (move-overlay (nth hw-cnt hiwin-overlays)
                           (point-min) (point-max) (current-buffer))
