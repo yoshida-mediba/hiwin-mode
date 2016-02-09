@@ -193,7 +193,7 @@ Face for inactive window.")
           ;; これをしないとポイントが遠くに飛ばされてしまう.
           (when (and (eq (point) (point-max))
                      (> (point-max) 1))
-            (insert " ")
+            (unless buffer-read-only (insert " "))
             (backward-char 1)
             )
           ;; 処理対象ウィンドウにオーバーレイを設定
