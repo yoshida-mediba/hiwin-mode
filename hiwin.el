@@ -188,12 +188,12 @@ Face for inactive window.")
         (save-selected-window
           ;; 処理対象ウィンドウを選択
           (select-window hw-tgt-win)
-          ;; バッファ末尾の場合，半角スペースを一文字挿入し, ポイント
-          ;; を一文字戻す.  overlayで末尾に改行をたくさん挿入するとき,
-          ;; これをしないとポイントが遠くに飛ばされてしまう.
+          ;; バッファ末尾の場合， ポイントを一文字戻す.  overlayの
+          ;; after-stringで末尾に改行をたくさん挿入するとき, こうしな
+          ;; いとポイントが遠くに飛ばされてしまう.
           (when (and (eq (point) (point-max))
                      (> (point-max) 1))
-            (unless buffer-read-only (insert " "))
+            ;; (unless buffer-read-only (insert " "))
             (backward-char 1)
             )
           ;; 処理対象ウィンドウにオーバーレイを設定
