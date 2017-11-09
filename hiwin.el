@@ -172,7 +172,7 @@
                                 (buffer-name (window-buffer hw-tgt-win))))
           (progn
             ;; 処理対象ウィンドウを選択
-            (select-window hw-tgt-win)
+            (select-window hw-tgt-win t)
             ;; 処理対象ウィンドウにオーバーレイを設定
             (move-overlay (nth hw-cnt hiwin-overlays)
                           (point-min) (point-max) (current-buffer))
@@ -184,7 +184,7 @@
     ;; 元のアクティブウィンドウを選択
     (when hiwin-server-flag
       (setq hiwin-server-flag 'nil))
-    (select-window hiwin-active-window)
+    (select-window hiwin-active-window t)
     ))
 
 ;;;###autoload
