@@ -1,12 +1,14 @@
-;;; hiwin.el --- Visible active window mode.
+;;; hiwin.el --- Visible active window mode. -*- lexical-binding: t; -*-
 ;;
 ;; Copyright (C) 2009 k.sugita
 ;;               2010 tomoya <tomoya.ton@gmail.com>
 ;;               2011 k.sugita <ksugita0510@gmail.com>
+;;               2016 ril
 ;;
 ;; Author: k.sugita
-;; Keywords: faces, editing, emulating
+;; Last Modified:
 ;; Version: 2.00
+;; Keywords: faces, editing, emulating
 ;;
 ;; This file is free software; you can redistribute it and/or modify
 ;; it under the terms of the GNU General Public License as published by
@@ -27,33 +29,39 @@
 ;;
 ;; put followings your .emacs
 ;;   (require 'hiwin)
-;;   (hiwin-activate)
+;;   (enabel-hiwin-mode)
 ;;   (set-face-background 'hiwin-face "gray80")
 ;;
-;; if you invisible active window, type M-x hiwin-deactivate.
+;; if you invisible active window, type M-x disable-hiwin-mode.
 
 ;;; Changes
 ;;
+;; 2016-02-07 ril
+;; - 変数名や関数名をいろいろと変更.
+;; - 描画対象外バッファの設定を実装.
+;;   `hiwin-ignore-buffer-names'から生成された正規表現
+;;   `hiwin-ignore-buffer-name-regexp'にマッチするか否かで判定する.
+;;
 ;; 2011-12-23 k.sugita
 ;; tails-marks.elを参考に以下の実装を見直し，修正
-;; ・ウィンドウ分割したとき，あるいはウィンドウ移動したとき
+;; - ウィンドウ分割したとき，あるいはウィンドウ移動したとき
 ;;   オーバーレイを再作成するように修正
-;; ・読み込み専用バッファの背景色を変更する処理を削除
-;; ・非アクティブウィンドウの配色をフェイスで設定
-;; ・描画対象外バッファの設定は未実装
-;; 
+;; - 読み込み専用バッファの背景色を変更する処理を削除
+;; - 非アクティブウィンドウの配色をフェイスで設定
+;; - 描画対象外バッファの設定は未実装
+;;
 ;; 2010-08-13 k.sugita
 ;; *Completions*表示時にMiniBufの表示が崩れるのを修正
 ;; 手動で画面リフレッシュできるようhiwin-refresh-winをinteractive化
 ;; 個人的な設定だったため，recenterのadviceを削除
-;; 
+;;
 ;; 2010-07-04 k.sugita
 ;; ローカルで再スクラッチしたファイルに tomoya氏，masutaka氏の修正を反映
 ;; readonlyなアクティブwindowの背景色を設定できるように機能変更
-;; 
+;;
 ;; 2010-06-07 tomoya
 ;; マイナーモード化
-;; 
+;;
 ;; 2009-09-13 k.sugita
 ;; ブログで公開
 ;; http://ksugita.blog62.fc2.com/blog-entry-8.html
@@ -62,45 +70,47 @@
 
 ;;; Code:
 
-;; hiwin-modeの実行状態．non-nilの場合，hiwin-modeは有効．
-(defvar hiwin-visible-status nil)
+(defgroup hiwin nil
+  "Visible active window mode"
+  :group 'emacs)
 
-;; 非アクティブウィンドウのオーバーレイ数．現在のウィンドウ数に等しい．
-(defvar hiwin-overlay-count nil)
+(defcustom hiwin-mode-lighter " hiwin"
+  "Lighter of hiwin-mode"
+  :type 'string
+  :group 'hiwin)
 
-;; 再描画時のアクティブウィンドウ．
-(defvar hiwin-active-window nil)
+(defcustom hiwin-ignore-buffer-names '("+draft/" "*helm")
+  "ハイライト対象外にするバッファ名のリスト. バッファ名にこのリス
+トの文字列が含まれるとき非アクティブウィンドウに表示されていても
+背景色を変えない. "
+  :type 'list
+  :group 'hiwin)
 
-;; 非アクティブウィンドウに描画するオーバーレイの行数．
-(defvar hiwin-overlay-lines 96)
+(defvar hiwin-ignore-buffer-name-regexp
+  (regexp-opt hiwin-ignore-buffer-names)
+  "ハイライト対象外のバッファ名の正規表現")
 
-;; 非アクティブウィンドウのオーバーレイ．
-(defvar hiwin-overlays nil)
-
-;; 常時アクティブにするバッファ名の正規表現
-(defvar hiwin-always-active-buffer-name-regexp "^\\*helm")
-
-
-;; 非アクティブウィンドウのオーバーレイ描画用のフェイス．
 (defface hiwin-face
   '((t (:background "gray25")))
-  "Face for inactive window.")
+  "非アクティブウィンドウのオーバーレイ描画用のフェイス．
+Face for inactive window.")
 
+(defvar hiwin-overlay-count nil
+  "非アクティブウィンドウのオーバーレイ数．現在のウィンドウ数に等しい．")
 
-(defvar hiwin-server-flag nil)
+(defvar hiwin-active-window nil
+  "再描画時のアクティブウィンドウ．")
 
-(define-minor-mode hiwin-mode
-  "Visible active window."
-  :global t
-  :lighter " hiwin"
-  :group 'hiwin
-  (if hiwin-visible-status (hiwin-deactivate) (hiwin-activate) )
-  )      
+(defvar hiwin-eob-overlay-lines 96
+  "非アクティブウィンドウの末尾に挿入するフェイス付きの空行の行数．")
 
-(defun hiwin-create-ol ()
+(defvar hiwin-overlays nil
+  "非アクティブウィンドウのオーバーレイ．")
+
+(defun hiwin-create-ovl ()
   (let (
-        (hw-buf nil) ;; 作業用バッファ
-        (hw-cnt 0)   ;; ループカウンタ
+        (hw-buf nil) ; 作業用バッファ
+        (hw-cnt 0)   ; ループカウンタ
         )
     ;; オーバーレイ作成済みの場合はスキップ
     (unless hiwin-overlays
@@ -112,12 +122,15 @@
         ;; 指定個数のオーバーレイを作成
         (while (< hw-cnt hiwin-overlay-count)
           ;; オーバーレイを作成
-          (setq hiwin-overlays (cons (make-overlay 1 1 hw-buf nil t) hiwin-overlays))
+          (setq hiwin-overlays
+                (cons (make-overlay 1 1 hw-buf nil t) hiwin-overlays))
           ;; 作成したオーバレイにフェイスを設定
           (overlay-put (nth 0 hiwin-overlays) 'face 'hiwin-face)
-          ;; 作成したオーバレイの EOFのフェイスを設定
+          ;; 作成したオーバレイの EOBのフェイスを設定propertizeでface
+          ;; が付加された改行をoverlayでbufferの末尾に、
+          ;; `hiwin-eob-overlay-lines'で指定された回数挿入
           (overlay-put (nth 0 hiwin-overlays) 'after-string
-                       (propertize (make-string hiwin-overlay-lines ?\n)
+                       (propertize (make-string hiwin-eob-overlay-lines ?\n)
                                    'face 'hiwin-face))
           ;; カウンタアップ
           (setq hw-cnt (1+ hw-cnt))
@@ -125,80 +138,72 @@
         ;; 作業用バッファを削除
         (kill-buffer hw-buf)
         ))
-      ))
-
-(defun hiwin-delete-ol ()
-  (let (
-        (hw-cnt 0) ;; ループカウンタ
-        )
-    ;; オーバーレイ未作成の場合はスキップ
-    (if hiwin-overlays
-        (progn
-          ;; 指定個数のオーバーレイを削除
-          (while (< hw-cnt hiwin-overlay-count)
-            ;; オーバーレイを削除
-            (delete-overlay (nth hw-cnt hiwin-overlays))
-            ;; カウンタアップ
-            (setq hw-cnt (1+ hw-cnt))
-            )
-          ;; 念のため初期化
-          (setq hiwin-overlays nil)
-          ))
     ))
 
-(defun hiwin-draw-ol ()
+(defun hiwin-delete-ovl ()
+  (let (
+        (hw-cnt 0) ; ループカウンタ
+        )
+    ;; オーバーレイ未作成の場合はスキップ
+    (when hiwin-overlays
+      ;; 指定個数のオーバーレイを削除
+      (while (< hw-cnt hiwin-overlay-count)
+        ;; オーバーレイを削除
+        (delete-overlay (nth hw-cnt hiwin-overlays))
+        ;; カウンタアップ
+        (setq hw-cnt (1+ hw-cnt))
+        )
+      ;; 初期化
+      (setq hiwin-overlays nil)
+      )
+    ))
+
+(defun hiwin-draw-ovl ()
   (interactive)
   ;; すべてのオーバーレイを削除
-  (hiwin-delete-ol)
+  (hiwin-delete-ovl)
   ;; その後，新たにオーバーレイを作成
-  (hiwin-create-ol)
+  (hiwin-create-ovl)
   ;; 描画時にアクティブなウィンドウを記憶
   (setq hiwin-active-window (selected-window))
   (let (
-        (hw-act-buf (current-buffer))  ;; アクティブ バッファ
-        (hw-tgt-win nil)               ;; 処理対象ウィンドウ
-        (hw-win-lst (window-list))     ;; ウィンドウリスト
-        (hw-cnt 0)                     ;; ループカウンタ
+        (hw-tgt-win nil)                ; 処理対象ウィンドウ
+        (hw-win-lst (window-list))      ; ウィンドウリスト
+        (hw-cnt 0)                      ; ループカウンタ
         )
     (while hw-win-lst
       ;; 処理対象ウィンドウを取得
       (setq hw-tgt-win (car hw-win-lst))
       ;; 取得したウィンドウをウィンドウリストから削除
       (setq hw-win-lst (cdr hw-win-lst))
-      ;; ミニバッファとアクティブ ウィンドウ以外を処理
+      ;; ミニバッファとアクティブ ウィンドウと
+      ;; `hiwin-ignore-buffer-name-regexp'で指定されたbufferの
+      ;; ウィンドウ以外を処理
       (unless (or (eq hw-tgt-win (minibuffer-window))
                   (eq hw-tgt-win hiwin-active-window)
-                  (string-match hiwin-always-active-buffer-name-regexp
+                  (string-match hiwin-ignore-buffer-name-regexp
                                 (buffer-name (window-buffer hw-tgt-win))))
-          (progn
-            ;; 処理対象ウィンドウを選択
-            (select-window hw-tgt-win)
-            ;; 処理対象ウィンドウにオーバーレイを設定
-            (move-overlay (nth hw-cnt hiwin-overlays)
-                          (point-min) (point-max) (current-buffer))
-            (overlay-put (nth hw-cnt hiwin-overlays) 'window hw-tgt-win)
-            ;; カウンタアップ
-            (setq hw-cnt (1+ hw-cnt))
+        (save-selected-window
+          ;; 処理対象ウィンドウを選択
+          (select-window hw-tgt-win)
+          ;; バッファ末尾の場合，半角スペース一文字を挿入し、ポイント
+          ;; を一文字戻す.  overlayで末尾に改行をたくさん挿入するため
+          ;; に、これをしないとポイントが遠くに飛ばされてしまう.
+          (when (and (eq (point) (point-max))
+                     (> (point-max) 1))
+            (insert " ")
+            (backward-char 1)
             )
-          ))
-    ;; 元のアクティブウィンドウを選択
-    (when hiwin-server-flag
-      (setq hiwin-server-flag 'nil))
-    (select-window hiwin-active-window)
+          ;; 処理対象ウィンドウにオーバーレイを設定
+          (move-overlay (nth hw-cnt hiwin-overlays)
+                        (point-min) (+ (buffer-size) 1) (current-buffer))
+          (overlay-put (nth hw-cnt hiwin-overlays) 'window hw-tgt-win)
+          (overlay-put (nth hw-cnt hiwin-overlays) 'priority 0)
+          )
+        ;; カウンタアップ
+        (setq hw-cnt (1+ hw-cnt))
+        ))
     ))
-
-;;;###autoload
-(defun hiwin-activate ()
-  (interactive)
-  (add-hook 'post-command-hook 'hiwin-command-hook)
-  )
-
-;;;###autoload
-(defun hiwin-deactivate ()
-  (interactive)
-  (remove-hook 'post-command-hook 'hiwin-command-hook)
-  (hiwin-delete-ol)
-  )
 
 (defun hiwin-command-hook ()
   ;; 前回の処理からウィンドウ数か，アクティブ ウィンドウが
@@ -208,19 +213,52 @@
     (if executing-kbd-macro
         (input-pending-p)
       (condition-case hiwin-error
-          (hiwin-draw-ol)
-        (error 
+          (hiwin-draw-ovl)
+        (error
          (if (not (window-minibuffer-p (selected-window)))
              (message "[%s] hiwin-mode catched error: %s"
                       (format-time-string "%H:%M:%S" (current-time))
-                      hiwin-error) ))
-        )
-      )
-    )
-  )
+                      hiwin-error) ))))))
 
-(add-hook 'server-visit-hook (lambda () 
-                               (setq hiwin-server-flag t)))
+(defun hiwin-activate ()
+  (interactive)
+  (add-hook 'post-command-hook 'hiwin-command-hook))
+
+(defun hiwin-deactivate ()
+  (interactive)
+  (remove-hook 'post-command-hook 'hiwin-command-hook)
+  (hiwin-delete-ovl))
+
+;;;###autoload
+(defun hiwin-refresh-ignore-buffer-names ()
+  "`hiwin-ignore-buffer-names'から実際にハイライトの有無を判定す
+る基準である, 正規表現`hiwin-ignore-buffer-name-regexp'を生成する."
+  (interactive)
+  (setq hiwin-ignore-buffer-name-regexp
+        (regexp-opt hiwin-ignore-buffer-names)))
+
+;;;###autoload
+(define-minor-mode hiwin-mode
+  "Visible active window."
+  :global t
+  :lighter hiwin-mode-lighter
+  :group 'hiwin
+  (if hiwin-mode
+      (hiwin-activate)
+    (hiwin-deactivate)
+    ))
+
+;;;###autoload
+(defun enable-hiwin-mode ()
+  "Turn on visible active window mode"
+  (interactive)
+  (hiwin-mode 1))
+
+;;;###autoload
+(defun disable-hiwin-mode ()
+  "Turn off visible active window mode"
+  (interactive)
+  (hiwin-mode -1))
 
 (provide 'hiwin)
 
