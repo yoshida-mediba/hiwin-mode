@@ -159,6 +159,7 @@
         (hw-tgt-win nil)               ;; 処理対象ウィンドウ
         (hw-win-lst (window-list))     ;; ウィンドウリスト
         (hw-cnt 0)                     ;; ループカウンタ
+        (minibuffer-selected-window (minibuffer-selected-window))
         )
     (while hw-win-lst
       ;; 処理対象ウィンドウを取得
@@ -168,6 +169,7 @@
       ;; ミニバッファとアクティブ ウィンドウ以外を処理
       (unless (or (eq hw-tgt-win (minibuffer-window))
                   (eq hw-tgt-win hiwin-active-window)
+                  (eq hw-tgt-win minibuffer-selected-window)
                   (string-match hiwin-always-active-buffer-name-regexp
                                 (buffer-name (window-buffer hw-tgt-win))))
           (progn
